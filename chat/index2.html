@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dark Mesh Global Group Chat</title>
+    <title>Dark Mesh Local Chat</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #000; color: #00ff00; font-family: 'Courier New', monospace; padding: 15px; height: 100vh; display: flex; flex-direction: column; }
@@ -22,17 +22,14 @@
 </head>
 <body>
 
-    <h3>[ ОБЩИЙ ПОДПОЛЬНЫЙ КАНАЛ ШКОЛЫ №76 ]</h3>
+    <h3>[ ЛОКАЛЬНЫЙ ШЛЮЗ ШКОЛЫ №76 ]</h3>
     <div id="chat"></div>
     
     <div class="controls">
         <input id="nick" type="text" value="Анон" maxlength="8">
-        <input id="msg" type="text" placeholder="Подключение к шине данных..." disabled autocomplete="off" maxlength="200">
-        <button id="send-btn" disabled onclick="send()">ЖДИ...</button>
+        <input id="msg" type="text" placeholder="Пиши сюда..." autocomplete="off" maxlength="200">
+        <button id="send-btn" onclick="send()">ОТПРАВИТЬ</button>
     </div>
-
-    <!-- Живая глобальная CDN-библиотека для связи между любыми сетями -->
-    <script src="pubnub.com"></script>
 
     <script>
         const chat = document.getElementById('chat');
@@ -41,49 +38,11 @@
         const sendBtn = document.getElementById('send-btn');
 
         let isCooldown = false;
-        chat.innerHTML = '<div class="msg-line system">Вход в защищенную глобальную сеть...</div>';
 
-        // Открытые ключи демо-сервера для работы без регистрации
-        const pubnub = new PubNub({
-            publishKey: 'pub-c-8a2bfb6a-939e-4ff6-9db8-0ffbc90ffbf5',
-            subscribeKey: 'sub-c-5e4835ea-d963-11eb-a029-2a3b0ff97c23',
-            userId: "user_" + Math.random().toString(36).substring(2, 9)
-        });
+        // Создаем чистый внутренний канал связи браузера
+        const channel = new BroadcastChannel('school_76_local_mesh');
 
-        // Имя нашей общей секретной комнаты
-        const channelName = "school_76_mesh_group_v3";
-
-        // Подключаемся к комнате
-        pubnub.subscribe({
-            channels: [channelName]
-        });
-
-        // Когда сеть успешно ответила
-        pubnub.addListener({
-            status: function(statusEvent) {
-                if (statusEvent.category === "PNConnectedCategory") {
-                    const loader = chat.querySelector('.system');
-                    if (loader) loader.remove();
-                    chat.innerHTML += '<div class="msg-line system" style="color:#00ff00">> ШЛЮЗ ОТКРЫТ. Сеть общая для всех устройств.</div>';
-                    msgInput.placeholder = "Пиши сюда...";
-                    msgInput.disabled = false;
-                    sendBtn.disabled = false;
-                    sendBtn.innerText = "ОТПРАВИТЬ";
-                }
-            },
-            // Логика приема сообщений в реальном времени со всего мира
-            message: function(messageEvent) {
-                const data = messageEvent.message;
-                
-                // Проверка на воскресный вайп
-                if (data.isWipeAction) {
-                    chat.innerHTML = '<div class="msg-line system">История чата была очищена по воскресному расписанию.</div>';
-                    return;
-                }
-
-                renderMessage(data.name, data.text);
-            }
-        });
+        chat.innerHTML = '<div class="msg-line system">> Локальный канал активен. Открой вторую вкладку для теста.</div>';
 
         function renderMessage(name, text) {
             const div = document.createElement('div');
@@ -93,7 +52,16 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
-        // Кулдаун 5 секунд защиты от спама
+        // Принимаем сообщения из соседних вкладок/окон
+        channel.onmessage = (event) => {
+            if (event.data.isWipeAction) {
+                chat.innerHTML = '<div class="msg-line system">История очищена по воскресному расписанию.</div>';
+                return;
+            }
+            renderMessage(event.data.name, event.data.text);
+        };
+
+        // Защита от спама на 5 секунд
         function startCooldown() {
             isCooldown = true;
             sendBtn.disabled = true;
@@ -109,7 +77,7 @@
                     isCooldown = false;
                 } else {
                     sendBtn.innerText = `[${timeLeft.toFixed(1)}s]`;
-                    msgInput.placeholder = "Защита от спама...";
+                    msgInput.placeholder = "Жди кулдаун...";
                 }
             }, 100);
         }
@@ -121,13 +89,11 @@
             const name = nickInput.value.trim() || 'Анон';
             const now = new Date();
 
-            // Авто-вайп: 0 — это воскресенье
+            // Авто-вайп по воскресеньям (0 — это воскресенье)
             if (now.getDay() === 0) {
                 startCooldown();
-                pubnub.publish({
-                    channel: channelName,
-                    message: { isWipeAction: true }
-                });
+                channel.postMessage({ isWipeAction: true });
+                chat.innerHTML = '<div class="msg-line system">История очищена по воскресному расписанию.</div>';
                 msgInput.value = '';
                 return;
             }
@@ -135,12 +101,11 @@
             if (text !== '') {
                 startCooldown();
                 
-                // Отправляем пакет данных в общую мировую шину
-                pubnub.publish({
-                    channel: channelName,
-                    message: { name: name, text: text }
-                });
-
+                // Передаем сообщение в соседние вкладки
+                channel.postMessage({ name: name, text: text });
+                
+                // Отрисовываем у себя
+                renderMessage(name, text);
                 msgInput.value = '';
             }
         }
