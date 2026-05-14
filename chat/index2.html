@@ -31,7 +31,7 @@
         <button id="send-btn" disabled onclick="send()">ЖДИ...</button>
     </div>
 
-    <!-- Загрузка полноценного сетевого скрипта Firebase -->
+    <!-- Подключаем живую библиотеку Firebase напрямую из интернета -->
     <script src="gstatic.com"></script>
     <script src="gstatic.com"></script>
 
@@ -45,15 +45,15 @@
 
         chat.innerHTML = '<div class="msg-line system">Авторизация на защищенном шлюзе...</div>';
 
-        // Глобальный публичный тестовый сервер
+        // РАБОЧИЙ ПУБЛИЧНЫЙ СЕРВЕР ДЛЯ ТЕСТА ЧАТА
         const firebaseConfig = {
-            databaseURL: "firebaseio.com"
+            databaseURL: "firebasedatabase.app"
         };
         
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database().ref('messages_76');
+        const db = firebase.database().ref('messages_school_76');
 
-        // Разблокировка интерфейса при коннекте
+        // Вход в сеть
         db.once('value').then(() => {
             const loader = chat.querySelector('.system');
             if (loader) loader.remove();
@@ -65,51 +65,24 @@
             chat.innerHTML += `<div class="msg-line" style="color:red">Ошибка шлюза: ${err.message}</div>`;
         });
 
-        // Безопасная функция очистки истории по воскресеньям
-        function checkAndWipeOldMessages(snapshot) {
-            const now = new Date();
-            if (now.getDay() === 0) { // 0 — это воскресенье
-                const data = snapshot.val();
-                if (data && data.timestamp) {
-                    const msgDate = new Date(data.timestamp);
-                    // Если сообщение старое (написано не сегодня), тихо удаляем из базы интернета
-                    if (msgDate.toDateString() !== now.toDateString()) {
-                        db.child(snapshot.key).remove();
-                        return true; 
-                    }
-                }
-            }
-            return false;
-        }
-
-        // Каждому блоку сообщения теперь даем уникальный ID из Firebase (data-id)
-        function renderMessage(id, name, text) {
+        // Функция вывода сообщения на экран
+        function renderMessage(name, text) {
             const div = document.createElement('div');
             div.className = 'msg-line';
-            div.setAttribute('data-id', id);
             div.innerHTML = `<b>[${name}]:</b> ${text}`;
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }
 
-        // Прием сообщений в реальном времени
-        db.limitToLast(50).on('child_added', (snapshot) => {
-            if (checkAndWipeOldMessages(snapshot)) return;
+        // ЖИВОЙ ПРИЕМ СООБЩЕНИЙ СО ВСЕХ ТЕЛЕФОНОВ
+        db.limitToLast(30).on('child_added', (snapshot) => {
             const data = snapshot.val();
             if (data) {
-                renderMessage(snapshot.key, data.name, data.text);
+                renderMessage(data.name, data.text);
             }
         });
 
-        // Бронебойное удаление по ID ключа — без ошибок и вылетов
-        db.on('child_removed', (snapshot) => {
-            const targetLine = chat.querySelector(`[data-id="${snapshot.key}"]`);
-            if (targetLine) {
-                targetLine.remove();
-            }
-        });
-
-        // Логика защиты от спама (кд 5 секунд)
+        // Кулдаун 5 секунд защиты от спама пацанов
         function startCooldown() {
             isCooldown = true;
             sendBtn.disabled = true;
@@ -125,12 +98,12 @@
                     isCooldown = false;
                 } else {
                     sendBtn.innerText = `[${timeLeft.toFixed(1)}s]`;
-                    msgInput.placeholder = "Жди кулдаун...";
+                    msgInput.placeholder = "Жди...";
                 }
             }, 100);
         }
 
-        // Функция отправки сообщений в интернет
+        // Функция отправки
         function send() {
             if (isCooldown) return;
 
@@ -141,8 +114,7 @@
                 startCooldown();
                 db.push({
                     name: name,
-                    text: text,
-                    timestamp: Date.now()
+                    text: text
                 });
                 msgInput.value = '';
             }
