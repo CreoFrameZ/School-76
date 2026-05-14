@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Mesh Chat</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #000; color: #00ff00; font-family: 'Courier New', monospace; padding: 15px; height: 100vh; display: flex; flex-direction: column; }
+        h3 { text-align: center; margin-bottom: 10px; font-size: 16px; letter-spacing: 2px; text-shadow: 0 0 5px #00ff00; }
+        #chat { flex: 1; border: 1px solid #00ff00; background: #050505; padding: 15px; overflow-y: auto; margin-bottom: 15px; border-radius: 4px; box-shadow: inset 0 0 10px #003300; }
+        .msg-line { margin-bottom: 8px; line-height: 1.4; font-size: 14px; word-break: break-all; }
+        .system { color: #888; font-style: italic; }
+        .controls { display: flex; gap: 10px; }
+        input { background: #111; color: #00ff00; border: 1px solid #00ff00; padding: 12px; font-family: inherit; font-size: 14px; border-radius: 4px; outline: none; }
+        input:focus { box-shadow: 0 0 5px #00ff00; }
+        #nick { width: 80px; text-align: center; }
+        #msg { flex: 1; }
+        button { background: #00ff00; color: #000; border: none; padding: 12px 20px; font-family: inherit; font-weight: bold; font-size: 14px; cursor: pointer; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <h3>[ ПОДПОЛЬНЫЙ ЧАТ ШКОЛЫ №76 ]</h3>
+    <div id="chat"></div>
+    
+    <div class="controls">
+        <input id="nick" type="text" value="Анон" maxlength="8">
+        <input id="msg" type="text" placeholder="Пиши сюда..." autocomplete="off" maxlength="200">
+        <button onclick="send()">ОТПРАВИТЬ</button>
+    </div>
+
+    <script>
+        const channel = new BroadcastChannel('school_mesh_network');
+        const chat = document.getElementById('chat');
+        const msgInput = document.getElementById('msg');
+        const nickInput = document.getElementById('nick');
+
+        // Проверка на воскресную очистку истории
+        function checkSundayWipe() {
+            const now = new Date();
+            // Если сегодня воскресенье (0) и время позднее вечера (или просто воскресенье для надежности)
+            if (now.getDay() === 0) {
+                const lastWipe = localStorage.getItem('last_wipe_day');
+                const todayStr = now.toDateString();
+                
+                if (lastWipe !== todayStr) {
+                    localStorage.removeItem('chat_history');
+                    localStorage.setItem('last_wipe_day', todayStr);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Загрузка сохраненной истории из памяти браузера
+        function loadHistory() {
+            checkSundayWipe();
+            chat.innerHTML = '<div class="msg-line system">Локальный зашифрованный узел активен.</div>';
+            const saved = localStorage.getItem('chat_history');
+            if (saved) {
+                const messages = JSON.parse(saved);
+                messages.forEach(m => renderMessage(m.name, m.text));
+            }
+        }
+
+        function saveMessage(name, text) {
+            if (checkSundayWipe()) return; // Если воскресенье и всё стерлось, не сохраняем старое
+            let messages = localStorage.getItem('chat_history') ? JSON.parse(localStorage.getItem('chat_history')) : [];
+            messages.push({ name, text });
+            localStorage.setItem('chat_history', JSON.stringify(messages));
+        }
+
+        function renderMessage(name, text) {
+            const div = document.createElement('div');
+            div.className = 'msg-line';
+            div.innerHTML = `<b>[${name}]:</b> ${text}`;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        channel.onmessage = (event) => {
+            renderMessage(event.data.name, event.data.text);
+            saveMessage(event.data.name, event.data.text);
+        };
+
+        function send() {
+            const text = msgInput.value.trim();
+            const name = nickInput.value.trim() || 'Анон';
+            if (text !== '') {
+                renderMessage(name, text);
+                saveMessage(name, text);
+                channel.postMessage({ name: name, text: text });
+                msgInput.value = '';
+            }
+        }
+
+        msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
+        
+        // Старт при запуске
+        loadHistory();
+    </script>
+</body>
+</html>
