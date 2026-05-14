@@ -47,7 +47,7 @@
 
         // Глобальный публичный тестовый сервер
         const firebaseConfig = {
-            databaseURL: "firebasedatabase.app"
+            databaseURL: "firebaseio.com" // Твой адрес базы
         };
         
         firebase.initializeApp(firebaseConfig);
@@ -65,15 +65,14 @@
             chat.innerHTML += `<div class="msg-line" style="color:red">Ошибка шлюза: ${err.message}</div>`;
         });
 
-        // Функция очистки истории по воскресеньям
+        // Безопасная функция очистки истории по воскресеньям
         function checkAndWipeOldMessages(snapshot) {
             const now = new Date();
-            // 0 — это воскресенье
-            if (now.getDay() === 0) {
+            if (now.getDay() === 0) { // 0 — это воскресенье
                 const data = snapshot.val();
                 if (data && data.timestamp) {
                     const msgDate = new Date(data.timestamp);
-                    // Если сообщение написано в другие дни недели — удаляем его из базы
+                    // Если сообщение старое (написано не сегодня), тихо удаляем из базы интернета
                     if (msgDate.toDateString() !== now.toDateString()) {
                         db.child(snapshot.key).remove();
                         return true; 
@@ -91,33 +90,42 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
-        // Прием сообщений со всех телефонов в реальном времени
+        // Прием сообщений в реальном времени
         db.limitToLast(50).on('child_added', (snapshot) => {
             if (checkAndWipeOldMessages(snapshot)) return;
             const data = snapshot.val();
             renderMessage(data.name, data.text);
         });
 
-        // Полное очищение экрана у всех, когда срабатывает вайп базы
-        db.on('child_removed', () => {
-            chat.innerHTML = '<div class="msg-line system">Локальный зашифрованный узел активен. История стёрта по расписанию.</div>';
+        // Мягкое удаление сообщений без полной блокировки экрана друга
+        db.on('child_removed', (snapshot) => {
+            // Ищем строку с этим сообщением на экране и просто убираем её, чтобы не ломать весь чат
+            const lines = chat.getElementsByClassName('msg-line');
+            for(let line of lines) {
+                if(line.innerHTML.includes(`:${snapshot.val().text}`)) {
+                    line.remove();
+                    break;
+                }
+            }
         });
 
-        // Логика защиты от спама (кд 2 секунды)
+        // Логика защиты от спама (кд 5 секунд)
         function startCooldown() {
             isCooldown = true;
             sendBtn.disabled = true;
-            let timeLeft = 2.0;
+            let timeLeft = 5.0;
 
             const timer = setInterval(() => {
                 timeLeft -= 0.1;
                 if (timeLeft <= 0) {
                     clearInterval(timer);
                     sendBtn.disabled = false;
+                    sendBtn.innerText = "ОТПРАВИТЬ";
                     msgInput.placeholder = "Пиши сюда...";
                     isCooldown = false;
                 } else {
-                    msgInput.placeholder = `[КД: ${timeLeft.toFixed(1)}s]`;
+                    sendBtn.innerText = `[${timeLeft.toFixed(1)}s]`;
+                    msgInput.placeholder = "Жди кулдаун...";
                 }
             }, 100);
         }
@@ -134,7 +142,7 @@
                 db.push({
                     name: name,
                     text: text,
-                    timestamp: Date.now() // Метка времени для воскресного удаления
+                    timestamp: Date.now()
                 });
                 msgInput.value = '';
             }
