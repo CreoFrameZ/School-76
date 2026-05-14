@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dark Mesh Chat</title>
+    <title>Dark Mesh Global Group Chat</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #000; color: #00ff00; font-family: 'Courier New', monospace; padding: 15px; height: 100vh; display: flex; flex-direction: column; }
@@ -22,18 +22,17 @@
 </head>
 <body>
 
-    <h3>[ ГЛОБАЛЬНЫЙ ПОДПОЛЬНЫЙ ЧАТ ШКОЛЫ №76 ]</h3>
+    <h3>[ ОБЩИЙ ПОДПОЛЬНЫЙ КАНАЛ ШКОЛЫ №76 ]</h3>
     <div id="chat"></div>
     
     <div class="controls">
         <input id="nick" type="text" value="Анон" maxlength="8">
-        <input id="msg" type="text" placeholder="Подключение к сети..." disabled autocomplete="off" maxlength="200">
+        <input id="msg" type="text" placeholder="Подключение к шине данных..." disabled autocomplete="off" maxlength="200">
         <button id="send-btn" disabled onclick="send()">ЖДИ...</button>
     </div>
 
-    <!-- Подключаем живую библиотеку Firebase напрямую из интернета -->
-    <script src="gstatic.com"></script>
-    <script src="gstatic.com"></script>
+    <!-- Живая глобальная CDN-библиотека для связи между любыми сетями -->
+    <script src="pubnub.com"></script>
 
     <script>
         const chat = document.getElementById('chat');
@@ -42,30 +41,50 @@
         const sendBtn = document.getElementById('send-btn');
 
         let isCooldown = false;
+        chat.innerHTML = '<div class="msg-line system">Вход в защищенную глобальную сеть...</div>';
 
-        chat.innerHTML = '<div class="msg-line system">Авторизация на защищенном шлюзе...</div>';
-
-        // РАБОЧИЙ ПУБЛИЧНЫЙ СЕРВЕР ДЛЯ ТЕСТА ЧАТА
-        const firebaseConfig = {
-            databaseURL: "firebasedatabase.app"
-        };
-        
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database().ref('messages_school_76');
-
-        // Вход в сеть
-        db.once('value').then(() => {
-            const loader = chat.querySelector('.system');
-            if (loader) loader.remove();
-            msgInput.placeholder = "Пиши сюда...";
-            msgInput.disabled = false;
-            sendBtn.disabled = false;
-            sendBtn.innerText = "ОТПРАВИТЬ";
-        }).catch(err => {
-            chat.innerHTML += `<div class="msg-line" style="color:red">Ошибка шлюза: ${err.message}</div>`;
+        // Открытые ключи демо-сервера для работы без регистрации
+        const pubnub = new PubNub({
+            publishKey: 'pub-c-8a2bfb6a-939e-4ff6-9db8-0ffbc90ffbf5',
+            subscribeKey: 'sub-c-5e4835ea-d963-11eb-a029-2a3b0ff97c23',
+            userId: "user_" + Math.random().toString(36).substring(2, 9)
         });
 
-        // Функция вывода сообщения на экран
+        // Имя нашей общей секретной комнаты
+        const channelName = "school_76_mesh_group_v3";
+
+        // Подключаемся к комнате
+        pubnub.subscribe({
+            channels: [channelName]
+        });
+
+        // Когда сеть успешно ответила
+        pubnub.addListener({
+            status: function(statusEvent) {
+                if (statusEvent.category === "PNConnectedCategory") {
+                    const loader = chat.querySelector('.system');
+                    if (loader) loader.remove();
+                    chat.innerHTML += '<div class="msg-line system" style="color:#00ff00">> ШЛЮЗ ОТКРЫТ. Сеть общая для всех устройств.</div>';
+                    msgInput.placeholder = "Пиши сюда...";
+                    msgInput.disabled = false;
+                    sendBtn.disabled = false;
+                    sendBtn.innerText = "ОТПРАВИТЬ";
+                }
+            },
+            // Логика приема сообщений в реальном времени со всего мира
+            message: function(messageEvent) {
+                const data = messageEvent.message;
+                
+                // Проверка на воскресный вайп
+                if (data.isWipeAction) {
+                    chat.innerHTML = '<div class="msg-line system">История чата была очищена по воскресному расписанию.</div>';
+                    return;
+                }
+
+                renderMessage(data.name, data.text);
+            }
+        });
+
         function renderMessage(name, text) {
             const div = document.createElement('div');
             div.className = 'msg-line';
@@ -74,15 +93,7 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
-        // ЖИВОЙ ПРИЕМ СООБЩЕНИЙ СО ВСЕХ ТЕЛЕФОНОВ
-        db.limitToLast(30).on('child_added', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                renderMessage(data.name, data.text);
-            }
-        });
-
-        // Кулдаун 5 секунд защиты от спама пацанов
+        // Кулдаун 5 секунд защиты от спама
         function startCooldown() {
             isCooldown = true;
             sendBtn.disabled = true;
@@ -98,24 +109,38 @@
                     isCooldown = false;
                 } else {
                     sendBtn.innerText = `[${timeLeft.toFixed(1)}s]`;
-                    msgInput.placeholder = "Жди...";
+                    msgInput.placeholder = "Защита от спама...";
                 }
             }, 100);
         }
 
-        // Функция отправки
         function send() {
             if (isCooldown) return;
 
             const text = msgInput.value.trim();
             const name = nickInput.value.trim() || 'Анон';
+            const now = new Date();
+
+            // Авто-вайп: 0 — это воскресенье
+            if (now.getDay() === 0) {
+                startCooldown();
+                pubnub.publish({
+                    channel: channelName,
+                    message: { isWipeAction: true }
+                });
+                msgInput.value = '';
+                return;
+            }
             
             if (text !== '') {
                 startCooldown();
-                db.push({
-                    name: name,
-                    text: text
+                
+                // Отправляем пакет данных в общую мировую шину
+                pubnub.publish({
+                    channel: channelName,
+                    message: { name: name, text: text }
                 });
+
                 msgInput.value = '';
             }
         }
