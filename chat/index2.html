@@ -47,7 +47,7 @@
 
         // Глобальный публичный тестовый сервер
         const firebaseConfig = {
-            databaseURL: "firebaseio.com" // Твой адрес базы
+            databaseURL: "firebaseio.com"
         };
         
         firebase.initializeApp(firebaseConfig);
@@ -82,9 +82,11 @@
             return false;
         }
 
-        function renderMessage(name, text) {
+        // Каждому блоку сообщения теперь даем уникальный ID из Firebase (data-id)
+        function renderMessage(id, name, text) {
             const div = document.createElement('div');
             div.className = 'msg-line';
+            div.setAttribute('data-id', id);
             div.innerHTML = `<b>[${name}]:</b> ${text}`;
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
@@ -94,18 +96,16 @@
         db.limitToLast(50).on('child_added', (snapshot) => {
             if (checkAndWipeOldMessages(snapshot)) return;
             const data = snapshot.val();
-            renderMessage(data.name, data.text);
+            if (data) {
+                renderMessage(snapshot.key, data.name, data.text);
+            }
         });
 
-        // Мягкое удаление сообщений без полной блокировки экрана друга
+        // Бронебойное удаление по ID ключа — без ошибок и вылетов
         db.on('child_removed', (snapshot) => {
-            // Ищем строку с этим сообщением на экране и просто убираем её, чтобы не ломать весь чат
-            const lines = chat.getElementsByClassName('msg-line');
-            for(let line of lines) {
-                if(line.innerHTML.includes(`:${snapshot.val().text}`)) {
-                    line.remove();
-                    break;
-                }
+            const targetLine = chat.querySelector(`[data-id="${snapshot.key}"]`);
+            if (targetLine) {
+                targetLine.remove();
             }
         });
 
