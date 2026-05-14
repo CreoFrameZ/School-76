@@ -11,12 +11,14 @@
         #chat { flex: 1; border: 1px solid #00ff00; background: #050505; padding: 15px; overflow-y: auto; margin-bottom: 15px; border-radius: 4px; box-shadow: inset 0 0 10px #003300; }
         .msg-line { margin-bottom: 8px; line-height: 1.4; font-size: 14px; word-break: break-all; }
         .system { color: #888; font-style: italic; }
+        .error-msg { color: #ff0000; font-weight: bold; }
         .controls { display: flex; gap: 10px; }
         input { background: #111; color: #00ff00; border: 1px solid #00ff00; padding: 12px; font-family: inherit; font-size: 14px; border-radius: 4px; outline: none; }
         input:focus { box-shadow: 0 0 5px #00ff00; }
         #nick { width: 80px; text-align: center; }
         #msg { flex: 1; }
         button { background: #00ff00; color: #000; border: none; padding: 12px 20px; font-family: inherit; font-weight: bold; font-size: 14px; cursor: pointer; border-radius: 4px; }
+        button:disabled { background: #003300; color: #006600; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -27,84 +29,119 @@
     <div class="controls">
         <input id="nick" type="text" value="Анон" maxlength="8">
         <input id="msg" type="text" placeholder="Пиши сюда..." autocomplete="off" maxlength="200">
-        <button onclick="send()">ОТПРАВИТЬ</button>
+        <button id="send-btn" onclick="send()">ОТПРАВИТЬ</button>
     </div>
 
-    <!-- Подключение стабильных версий Firebase для работы через любой интернет -->
+    <!-- Полные и точные ссылки на библиотеки Firebase -->
     <script src="gstatic.com"></script>
     <script src="gstatic.com"></script>
 
     <script>
-        // Общий публичный тестовый сервер для связи устройств
-        const firebaseConfig = {
-            databaseURL: "firebasedatabase.app"
-        };
-        
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database().ref('messages');
-
         const chat = document.getElementById('chat');
         const msgInput = document.getElementById('msg');
         const nickInput = document.getElementById('nick');
+        const sendBtn = document.getElementById('send-btn');
 
-        chat.innerHTML = '<div class="msg-line system">Синхронизация с узлом сети...</div>';
+        // Переменная для отслеживания кулдауна
+        let isCooldown = false;
 
-        // Проверка и удаление старых сообщений (Вайп по воскресеньям)
-        function checkAndWipeOldMessages(snapshot) {
-            const now = new Date();
-            // Если сегодня воскресенье (0)
-            if (now.getDay() === 0) {
-                const data = snapshot.val();
-                if (data && data.timestamp) {
-                    const msgDate = new Date(data.timestamp);
-                    // Если сообщение было написано НЕ сегодня, удаляем его у всех
-                    if (msgDate.toDateString() !== now.toDateString()) {
-                        firebase.database().ref('messages/' + snapshot.key).remove();
-                        return true; 
+        chat.innerHTML = '<div class="msg-line system">Синхронизация с глобальным узлом...</div>';
+
+        if (typeof firebase === 'undefined') {
+            chat.innerHTML += '<div class="msg-line error-msg">[ОШИБКА]: Сетевые модули не загрузились. Проверь интернет или ссылки!</div>';
+        } else {
+            // Публичный тестовый сервер
+            const firebaseConfig = {
+                databaseURL: "firebasedatabase.app"
+            };
+            
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.database().ref('messages');
+
+            // Вайп по воскресеньям
+            function checkAndWipeOldMessages(snapshot) {
+                const now = new Date();
+                if (now.getDay() === 0) {
+                    const data = snapshot.val();
+                    if (data && data.timestamp) {
+                        const msgDate = new Date(data.timestamp);
+                        if (msgDate.toDateString() !== now.toDateString()) {
+                            db.child(snapshot.key).remove();
+                            return true; 
+                        }
                     }
                 }
+                return false;
             }
-            return false;
-        }
 
-        function renderMessage(name, text) {
-            const div = document.createElement('div');
-            div.className = 'msg-line';
-            div.innerHTML = `<b>[${name}]:</b> ${text}`;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        // Прием сообщений из интернета в реальном времени
-        db.limitToLast(50).on('child_added', (snapshot) => {
-            if (checkAndWipeOldMessages(snapshot)) return;
-
-            const data = snapshot.val();
-            const loader = chat.querySelector('.system');
-            if (loader && loader.innerText.includes('Синхронизация')) loader.remove();
-            
-            renderMessage(data.name, data.text);
-        });
-
-        // Отслеживание удаления сообщений (очистка экрана при вайпе)
-        db.on('child_removed', () => {
-            chat.innerHTML = '';
-        });
-
-        function send() {
-            const text = msgInput.value.trim();
-            const name = nickInput.value.trim() || 'Анон';
-            if (text !== '') {
-                db.push({
-                    name: name,
-                    text: text,
-                    timestamp: Date.now() // Время отправки для контроля воскресного удаления
-                });
-                msgInput.value = '';
+            function renderMessage(name, text) {
+                const div = document.createElement('div');
+                div.className = 'msg-line';
+                div.innerHTML = `<b>[${name}]:</b> ${text}`;
+                chat.appendChild(div);
+                chat.scrollTop = chat.scrollHeight;
             }
-        }
 
-        msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
+            // Прием сообщений
+            db.limitToLast(50).on('child_added', (snapshot) => {
+                if (checkAndWipeOldMessages(snapshot)) return;
+
+                const data = snapshot.val();
+                const loader = chat.querySelector('.system');
+                if (loader && loader.innerText.includes('Синхронизация')) loader.remove();
+                
+                renderMessage(data.name, data.text);
+            });
+
+            // Очистка экрана при удалении
+            db.on('child_removed', () => {
+                chat.innerHTML = '';
+            });
+
+            // Функция запуска кулдауна
+            function startCooldown() {
+                isCooldown = true;
+                sendBtn.disabled = true;
+                let timeLeft = 2.0;
+
+                const timer = setInterval(() => {
+                    timeLeft -= 0.1;
+                    if (timeLeft <= 0) {
+                        clearInterval(timer);
+                        sendBtn.disabled = false;
+                        msgInput.placeholder = "Пиши сюда...";
+                        isCooldown = false;
+                    } else {
+                        msgInput.placeholder = `[КД: ${timeLeft.toFixed(1)}s]`;
+                    }
+                }, 100);
+            }
+
+            // Функция отправки
+            window.send = function() {
+                if (isCooldown) return; // Если КД активен, ничего не делаем
+
+                const text = msgInput.value.trim();
+                const name = nickInput.value.trim() || 'Анон';
+                
+                if (text !== '') {
+                    startCooldown(); // Включаем КД сразу при отправке
+
+                    db.push({
+                        name: name,
+                        text: text,
+                        timestamp: Date.now()
+                    }).catch(err => {
+                        renderMessage('СИСТЕМА', 'Ошибка отправки: ' + err.message);
+                    });
+                    msgInput.value = '';
+                }
+            }
+
+            msgInput.addEventListener('keypress', (e) => { 
+                if (e.key === 'Enter' && !isCooldown) send(); 
+            });
+        }
     </script>
 </body>
 </html>
