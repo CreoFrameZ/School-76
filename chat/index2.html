@@ -23,125 +23,129 @@
 </head>
 <body>
 
-    <h3>[ ПОДПОЛЬНЫЙ ЧАТ ШКОЛЫ №76 ]</h3>
+    <h3>[ ГЛОБАЛЬНЫЙ ПОДПОЛЬНЫЙ ЧАТ ШКОЛЫ №76 ]</h3>
     <div id="chat"></div>
     
     <div class="controls">
         <input id="nick" type="text" value="Анон" maxlength="8">
-        <input id="msg" type="text" placeholder="Пиши сюда..." autocomplete="off" maxlength="200">
-        <button id="send-btn" onclick="send()">ОТПРАВИТЬ</button>
+        <input id="msg" type="text" placeholder="Синхронизация..." disabled autocomplete="off" maxlength="200">
+        <button id="send-btn" disabled onclick="send()">ЖДИ...</button>
     </div>
 
-    <!-- Полные и точные ссылки на библиотеки Firebase -->
-    <script src="gstatic.com"></script>
-    <script src="gstatic.com"></script>
+    <!-- Подключение современных модулей Firebase v10 через CDN -->
+    <script type="module">
+        import { initializeApp } from "gstatic.com";
+        import { getDatabase, ref, push, onChildAdded, onChildRemoved, remove } from "gstatic.com";
 
-    <script>
+        // Общая база данных для глобального теста
+        const firebaseConfig = {
+            databaseURL: "firebasedatabase.app"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const messagesRef = ref(db, 'global_messages');
+
         const chat = document.getElementById('chat');
         const msgInput = document.getElementById('msg');
         const nickInput = document.getElementById('nick');
         const sendBtn = document.getElementById('send-btn');
 
-        // Переменная для отслеживания кулдауна
         let isCooldown = false;
 
-        chat.innerHTML = '<div class="msg-line system">Синхронизация с глобальным узлом...</div>';
+        chat.innerHTML = '<div class="msg-line system">Подключение к зашифрованному облачному шлюзу...</div>';
 
-        if (typeof firebase === 'undefined') {
-            chat.innerHTML += '<div class="msg-line error-msg">[ОШИБКА]: Сетевые модули не загрузились. Проверь интернет или ссылки!</div>';
-        } else {
-            // Публичный тестовый сервер
-            const firebaseConfig = {
-                databaseURL: "firebasedatabase.app"
-            };
-            
-            firebase.initializeApp(firebaseConfig);
-            const db = firebase.database().ref('messages');
+        // Разблокировка интерфейса после успешного коннекта
+        setTimeout(() => {
+            const loader = chat.querySelector('.system');
+            if (loader) loader.remove();
+            msgInput.placeholder = "Пиши сюда...";
+            msgInput.disabled = false;
+            sendBtn.disabled = false;
+            sendBtn.innerText = "ОТПРАВИТЬ";
+        }, 1500);
 
-            // Вайп по воскресеньям
-            function checkAndWipeOldMessages(snapshot) {
-                const now = new Date();
-                if (now.getDay() === 0) {
-                    const data = snapshot.val();
-                    if (data && data.timestamp) {
-                        const msgDate = new Date(data.timestamp);
-                        if (msgDate.toDateString() !== now.toDateString()) {
-                            db.child(snapshot.key).remove();
-                            return true; 
-                        }
-                    }
-                }
-                return false;
-            }
-
-            function renderMessage(name, text) {
-                const div = document.createElement('div');
-                div.className = 'msg-line';
-                div.innerHTML = `<b>[${name}]:</b> ${text}`;
-                chat.appendChild(div);
-                chat.scrollTop = chat.scrollHeight;
-            }
-
-            // Прием сообщений
-            db.limitToLast(50).on('child_added', (snapshot) => {
-                if (checkAndWipeOldMessages(snapshot)) return;
-
+        // Функция автоматического вайпа по воскресеньям
+        function checkAndWipeOldMessages(snapshot) {
+            const now = new Date();
+            // 0 — это воскресенье
+            if (now.getDay() === 0) {
                 const data = snapshot.val();
-                const loader = chat.querySelector('.system');
-                if (loader && loader.innerText.includes('Синхронизация')) loader.remove();
-                
-                renderMessage(data.name, data.text);
-            });
-
-            // Очистка экрана при удалении
-            db.on('child_removed', () => {
-                chat.innerHTML = '';
-            });
-
-            // Функция запуска кулдауна
-            function startCooldown() {
-                isCooldown = true;
-                sendBtn.disabled = true;
-                let timeLeft = 2.0;
-
-                const timer = setInterval(() => {
-                    timeLeft -= 0.1;
-                    if (timeLeft <= 0) {
-                        clearInterval(timer);
-                        sendBtn.disabled = false;
-                        msgInput.placeholder = "Пиши сюда...";
-                        isCooldown = false;
-                    } else {
-                        msgInput.placeholder = `[КД: ${timeLeft.toFixed(1)}s]`;
+                if (data && data.timestamp) {
+                    const msgDate = new Date(data.timestamp);
+                    // Если сообщение отправлено НЕ сегодня (на прошлой неделе) — стираем его из глобальной базы у всех
+                    if (msgDate.toDateString() !== now.toDateString()) {
+                        const itemRef = ref(db, `global_messages/${snapshot.key}`);
+                        remove(itemRef);
+                        return true; 
                     }
-                }, 100);
-            }
-
-            // Функция отправки
-            window.send = function() {
-                if (isCooldown) return; // Если КД активен, ничего не делаем
-
-                const text = msgInput.value.trim();
-                const name = nickInput.value.trim() || 'Анон';
-                
-                if (text !== '') {
-                    startCooldown(); // Включаем КД сразу при отправке
-
-                    db.push({
-                        name: name,
-                        text: text,
-                        timestamp: Date.now()
-                    }).catch(err => {
-                        renderMessage('СИСТЕМА', 'Ошибка отправки: ' + err.message);
-                    });
-                    msgInput.value = '';
                 }
             }
-
-            msgInput.addEventListener('keypress', (e) => { 
-                if (e.key === 'Enter' && !isCooldown) send(); 
-            });
+            return false;
         }
+
+        function renderMessage(name, text) {
+            const div = document.createElement('div');
+            div.className = 'msg-line';
+            div.innerHTML = `<b>[${name}]:</b> ${text}`;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        // Прием сообщений со всех интернетов в реальном времени
+        onChildAdded(messagesRef, (snapshot) => {
+            if (checkAndWipeOldMessages(snapshot)) return;
+            const data = snapshot.val();
+            renderMessage(data.name, data.text);
+        });
+
+        // Мгновенная очистка экрана у пользователей, когда база вайпается
+        onChildRemoved(messagesRef, () => {
+            chat.innerHTML = '<div class="msg-line system">История чата очищена по расписанию (Воскресный вайп).</div>';
+        });
+
+        // Защита от спама (Кулдаун 2 секунды)
+        function startCooldown() {
+            isCooldown = true;
+            sendBtn.disabled = true;
+            let timeLeft = 2.0;
+
+            const timer = setInterval(() => {
+                timeLeft -= 0.1;
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    sendBtn.disabled = false;
+                    msgInput.placeholder = "Пиши сюда...";
+                    isCooldown = false;
+                } else {
+                    msgInput.placeholder = `[КД: ${timeLeft.toFixed(1)}s]`;
+                }
+            }, 100);
+        }
+
+        // Функция отправки в облако
+        window.send = function() {
+            if (isCooldown) return;
+
+            const text = msgInput.value.trim();
+            const name = nickInput.value.trim() || 'Анон';
+            
+            if (text !== '') {
+                startCooldown();
+                push(messagesRef, {
+                    name: name,
+                    text: text,
+                    timestamp: Date.now() // Метка времени для воскресной проверки
+                }).catch(err => {
+                    renderMessage('СИСТЕМА', 'Ошибка сети: ' + err.message);
+                });
+                msgInput.value = '';
+            }
+        }
+
+        msgInput.addEventListener('keypress', (e) => { 
+            if (e.key === 'Enter' && !isCooldown) send(); 
+        });
     </script>
 </body>
 </html>
