@@ -1,81 +1,119 @@
-.cent {
-    text-align: center;      
-    margin-top: 30px;        
-}
-
-.cent h1 {
-    display: inline-block;   
-    margin: 10px 15px;       
-}
-
-.cent a {
-    display: inline-block;   
-    text-decoration: none;   
-    background-color: #7f7f7f; 
-    color: #2F4F4F;          
-    
-    padding: 10px 20px;      
-    border: 3px solid #00ff00; 
-    
-    font-family: 'Courier New', monospace; 
-}
-
-.cent a:hover {
-    background-color: #00ff00; 
-    color: #000000;            
-}
-
+/* Простой, строгий Y2K / Python-doc стиль */
 body {
-    background-color: #2F4F4F;
-    background-image: url("images/bg.png");
+    background-color: #1a1a1a;
+    color: #cccccc;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
 }
 
-.cntr {
-    width: 50%;
-    margin: 0 auto;
+/* Мелкая техническая строка сверху */
+.verification-tag {
+    color: #555555;
+    font-size: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px dashed #333333;
 }
 
-.text {
-    font-size: 40px;
-    font-weight: bold; 
-    color: #00ff00;    
-    line-height: 1.5;
-    margin-bottom: 12px;
+/* Шапка а-ля старый гитхаб / текстовый интерфейс */
+.site-header {
+    background-color: #222222;
+    border-bottom: 1px solid #333333;
+    padding: 15px 20px;
 }
 
-.clsh1 {
-    color: #6d8b74;
-}
-
-.div1 {
-    background-color: #2F4F4F;
-    margin: 0 auto;
-    text-align: center;
-    border-radius: 10px;
-    background-image: url("images/bg1.png");
-}
-
-
-.text1 {
-    color: cadetblue;
-    font-size: 30px;
-    font-weight: bold;       
-    text-align: left;        
-    display: inline-block;   
-    list-style-type: none;  
-    padding: 0;              
-}
-
-
-.text1 li {
-    list-style-type: none;
-    margin-bottom: 8px;      
-}
-.text-left {
-    color: cadetblue;
-    font-size: 30px;
+.nav-links a {
+    color: #888888;
+    text-decoration: none;
+    margin-right: 20px;
     font-weight: bold;
-    text-align: left;
-    margin-bottom: 15px;
 }
 
+.nav-links a:hover {
+    color: #ffffff;
+}
+
+.nav-links a.active {
+    color: #00ff66; /* Зеленоватый акцент на активной странице */
+}
+
+/* Главный контейнер (строго по центру, не растягивается в кашу) */
+.main-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+/* Оформление секций */
+.content-section {
+    margin-bottom: 40px;
+    border-bottom: 1px dashed #333333;
+    padding-bottom: 20px;
+}
+
+.content-section:last-child {
+    border-bottom: none;
+}
+
+/* Заголовки */
+h1 {
+    color: #ffffff;
+    font-size: 24px;
+    margin-top: 0;
+}
+
+h2 {
+    color: #00ff66;
+    font-size: 18px;
+    margin-top: 0;
+}
+
+/* Ссылки */
+a {
+    color: #3399ff;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Списки */
+ul {
+    padding-left: 20px;
+}
+
+li {
+    margin-bottom: 10px;
+}
+
+/* Оформление ников команды под теги (бэкенд вайб) */
+code {
+    background-color: #2b2b2b;
+    color: #ff9933;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+strong {
+    color: #ffffff;
+}
+
+/* Подвал сайта */
+.site-footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: #555555;
+    font-size: 14px;
+    border-top: 1px solid #333333;
+    background-color: #151515;
+}
+
+/* Адаптивность для мобилок */
+@media (max-width: 600px) {
+    .main-container { margin: 20px auto; }
+    .nav-links a { display: block; margin-bottom: 10px; }
+}
